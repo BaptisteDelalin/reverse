@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Prout Parleur</title>
+<meta name="theme-color" content="#16251a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Prout">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root { --bg:#16251a; --card:#213826; --accent:#9be15d; --accent2:#ffd23f; --brown:#8b5a2b; --text:#f4fff0; --muted:#a8c9a3; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; background:var(--bg); }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--text);
+         background:radial-gradient(circle at top,#2f5a35,var(--bg) 65%) fixed; min-height:100vh;
+         padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+         -webkit-user-select:none; user-select:none; }
+  main { max-width:520px; margin:0 auto; padding:18px 16px 40px; text-align:center; }
+  h1 { font-size:2.2rem; margin:8px 0 0; }
+  .sub { color:var(--muted); margin:4px 0 18px; }
+  .card { background:var(--card); border-radius:22px; padding:18px; margin-bottom:14px; border:1px solid #2e4d33; }
+  button { font:inherit; font-weight:800; border:0; border-radius:18px; cursor:pointer; color:#13200f;
+           transition:transform .08s; touch-action:manipulation; }
+  button:active:not(:disabled) { transform:scale(.95); }
+  button:disabled { opacity:.35; }
+  #rec { width:170px; height:170px; border-radius:50%; font-size:1.2rem; background:var(--accent);
+         box-shadow:0 10px 30px rgba(155,225,93,.35); display:flex; flex-direction:column; align-items:center; justify-content:center; margin:6px auto 10px; }
+  #rec .ico { font-size:3.2rem; line-height:1; margin-bottom:6px; }
+  #rec.on { background:#ff5a5a; color:#fff; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { box-shadow:0 0 0 18px rgba(255,90,90,.18); } }
+  .timer { color:var(--muted); font-variant-numeric:tabular-nums; min-height:1.3em; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .row button { padding:16px 10px; font-size:1rem; background:#36573b; color:var(--text); }
+  #fart { grid-column:1 / -1; font-size:1.35rem; padding:20px; background:linear-gradient(90deg,var(--accent2),var(--accent)); color:#13200f; }
+  .styles { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+  .chip { padding:10px 14px; border-radius:999px; background:#2c4a31; color:var(--text); font-weight:700; font-size:.95rem; border:2px solid transparent; }
+  .chip.sel { border-color:var(--accent2); background:#3d6343; }
+  h2 { font-size:1rem; margin:0 0 10px; color:var(--muted); font-weight:700; }
+  canvas { width:100%; height:54px; display:block; margin-top:12px; background:#142217; border-radius:12px; }
+  .msg { color:#ffb4b4; min-height:1.2em; font-size:.9rem; }
+  #installTip { display:none; background:#24402a; border-radius:14px; padding:12px 14px; font-size:.85rem; color:var(--muted); margin-bottom:14px; }
+  footer { color:var(--muted); font-size:.8rem; margin-top:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>💨 Prout Parleur</h1>
+  <p class="sub">Dis une phrase… je la répète en prout !</p>
+  <div id="installTip"></div>
+  <p class="msg" id="msg"></p>
+
+  <div class="card">
+    <button id="rec"><span class="ico">🎤</span><span id="recLabel">Appuie et parle</span></button>
+    <div class="timer" id="timer"></div>
+    <canvas id="wave"></canvas>
+    <div class="row">
+      <button id="fart" disabled>💨 Version prout !</button>
+      <button id="voice" disabled>🗣️ Ma voix</button>
+      <button id="share" disabled>📤 Partager</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Choisis ton prout</h2>
+    <div class="styles" id="styles"></div>
+  </div>
+
+  <footer>Rien n'est envoyé sur internet : tout reste sur le téléphone.</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let ctx, stream, current, voiceBuf = null, analysis = null, lastFart = null;
+
+const STYLES = {
+  classique: { label:'😆 Classique', base:85,  follow:0.55, noise:0.18, cut:650,  q:3.0, flutter:22, drive:2.2, jitter:0.10 },
+  mouille:   { label:'💦 Mouillé',   base:60,  follow:0.45, noise:0.45, cut:900,  q:1.6, flutter:34, drive:2.8, jitter:0.22 },
+  trompette: { label:'🎺 Trompette', base:150, follow:0.85, noise:0.06, cut:1300, q:5.0, flutter:12, drive:2.0, jitter:0.05 },
+  geant:     { label:'🦣 Géant',     base:45,  follow:0.40, noise:0.22, cut:420,  q:3.5, flutter:16, drive:3.2, jitter:0.12 },
+  timide:    { label:'🐭 Timide',    base:260, follow:0.90, noise:0.10, cut:2200, q:6.0, flutter:30, drive:1.6, jitter:0.08 },
+};
+let styleKey = 'classique';
+
+function buildStyles() {
+  const box = $('styles');
+  for (const [k, s] of Object.entries(STYLES)) {
+    const b = document.createElement('button');
+    b.className = 'chip' + (k === styleKey ? ' sel' : '');
+    b.textContent = s.label;
+    b.onclick = () => {
+      styleKey = k;
+      [...box.children].forEach(c => c.classList.remove('sel'));
+      b.classList.add('sel');
+      if (analysis) { lastFart = synth(analysis, STYLES[k]); play(lastFart); draw(lastFart); }
+    };
+    box.appendChild(b);
+  }
+}
+
+function audioCtx() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; }
+function msg(t) { $('msg').textContent = t || ''; }
+function stop() { if (current) { try { current.stop(); } catch(e){} current = null; } }
+
+function play(b) {
+  stop();
+  const c = audioCtx(); c.resume();
+  const s = c.createBufferSource();
+  s.buffer = b; s.connect(c.destination); s.start();
+  current = s;
+}
+
+function draw(b) {
+  const cv = $('wave'), w = cv.width = cv.clientWidth * 2, h = cv.height = 108;
+  const g = cv.getContext('2d'); g.clearRect(0,0,w,h);
+  const d = b.getChannelData(0), step = Math.max(1, Math.floor(d.length / w));
+  g.fillStyle = b === voiceBuf ? '#9be15d' : '#c98a4b';
+  for (let x = 0; x < w; x++) {
+    let m = 0; for (let i = 0; i < step; i++) m = Math.max(m, Math.abs(d[x*step + i] || 0));
+    const bh = Math.max(2, Math.min(1, m * 1.3) * h); g.fillRect(x, (h - bh) / 2, 1, bh);
+  }
+}
+
+/* ---------- Analyse de la voix : volume + hauteur, toutes les 10 ms ---------- */
+function analyse(buf) {
+  const sr = buf.sampleRate, src = buf.getChannelData(0);
+  // Sous-échantillonnage à ~12 kHz pour la détection de hauteur (rapide sur téléphone)
+  const ds = Math.max(1, Math.round(sr / 12000)), dsr = sr / ds;
+  const low = new Float32Array(Math.floor(src.length / ds));
+  for (let i = 0; i < low.length; i++) { let s = 0; for (let j = 0; j < ds; j++) s += src[i*ds + j]; low[i] = s / ds; }
+
+  const hop = Math.round(dsr * 0.01), win = Math.round(dsr * 0.04);
+  const minLag = Math.floor(dsr / 500), maxLag = Math.floor(dsr / 75);
+  const frames = Math.max(1, Math.floor((low.length - win) / hop));
+  const rms = new Float32Array(frames), pitch = new Float32Array(frames);
+  let maxR = 0;
+  for (let f = 0; f < frames; f++) {
+    const o = f * hop; let e = 0;
+    for (let i = 0; i < win; i++) e += low[o+i] * low[o+i];
+    rms[f] = Math.sqrt(e / win); if (rms[f] > maxR) maxR = rms[f];
+  }
+  const gate = maxR * 0.12;
+  let lastP = 180;
+  for (let f = 0; f < frames; f++) {
+    if (rms[f] < gate) { pitch[f] = lastP; continue; }
+    const o = f * hop; let best = 0, bestLag = 0;
+    let e0 = 0; for (let i = 0; i < win; i++) e0 += low[o+i] * low[o+i];
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let c = 0; for (let i = 0; i < win - lag; i++) c += low[o+i] * low[o+i+lag];
+      if (c > best) { best = c; bestLag = lag; }
+    }
+    if (bestLag && best / (e0 || 1) > 0.3) lastP = 0.6 * lastP + 0.4 * (dsr / bestLag);
+    pitch[f] = lastP;
+  }
+  // Enveloppe normalisée, lissée (attaque rapide, relâche douce)
+  const env = new Float32Array(frames); let v = 0;
+  for (let f = 0; f < frames; f++) {
+    const target = Math.max(0, (rms[f] - gate) / ((maxR - gate) || 1));
+    v += (target > v ? 0.6 : 0.18) * (target - v);
+    env[f] = Math.min(1, Math.pow(v, 0.7));
+  }
+  return { env, pitch, frames, frameDur: 0.01, sr, length: buf.length };
+}
+
+/* ---------- Synthèse du prout qui suit la phrase ---------- */
+function synth(a, st) {
+  const sr = a.sr, tail = Math.round(sr * 0.25), n = a.length + tail;
+  const out = audioCtx().createBuffer(1, n, sr), y = out.getChannelData(0);
+  // Filtre passe-bas résonant (RBJ biquad) : donne le "corps" du prout
+  const w0 = 2 * Math.PI * Math.min(st.cut, sr * 0.45) / sr, al = Math.sin(w0) / (2 * st.q), cw = Math.cos(w0);
+  const a0 = 1 + al, b0 = (1 - cw) / 2 / a0, b1 = (1 - cw) / a0, b2 = b0, a1 = -2 * cw / a0, a2 = (1 - al) / a0;
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  let phase = 0, fl = Math.random() * 6.28, jit = 0, period = 1, peak = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr, fi = Math.min(a.frames - 1, Math.floor(t / a.frameDur));
+    const e = i < a.length ? a.env[fi] : 0;
+    if (e <= 0.001 && i >= a.length) { y[i] = 0; continue; }
+    jit += (Math.random() * 2 - 1) * 0.02; jit *= 0.995;
+    const f = st.base * Math.pow(a.pitch[fi] / 180, st.follow) * (1 + st.jitter * jit) * (0.85 + 0.3 * e);
+    phase += f / sr * period;
+    if (phase >= 1) { phase -= 1; period = 1 + (Math.random() * 2 - 1) * st.jitter; }
+    const pulse = Math.exp(-phase * 7) * 2 - 0.35;              // impulsion "brrr"
+    const noise = Math.random() * 2 - 1;
+    fl += 2 * Math.PI * st.flutter * (1 + 0.3 * Math.sin(t * 3.1)) / sr;
+    const flutter = 0.55 + 0.45 * Math.sin(fl);                 // vibration des "lèvres"
+    const x = (pulse * (1 - st.noise) + noise * st.noise) * flutter * e;
+    const yy = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1; x1 = x; y2 = y1; y1 = yy;
+    const s = Math.tanh(yy * st.drive);
+    y[i] = s; if (Math.abs(s) > peak) peak = Math.abs(s);
+  }
+  const g = peak ? 0.92 / peak : 1;
+  for (let i = 0; i < n; i++) y[i] *= g;
+  return out;
+}
+
+async function decode(blob) {
+  const ab = await blob.arrayBuffer(), c = audioCtx();
+  return await new Promise((res, rej) => { const p = c.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+}
+
+function pickMime() {
+  const types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/aac'];
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+/* ---------- Enregistrement ---------- */
+let rec = null, chunks = [], t0 = 0, tick = null;
+$('rec').onclick = async () => {
+  if (rec && rec.state === 'recording') { rec.stop(); return; }
+  msg(); stop(); audioCtx().resume();
+  try { if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { msg("Micro refusé. Autorise le micro pour ce site dans les réglages du navigateur."); return; }
+  chunks = [];
+  const mime = pickMime();
+  rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+  rec.ondataavailable = e => e.data && e.data.size && chunks.push(e.data);
+  rec.onstop = async () => {
+    clearInterval(tick); $('rec').classList.remove('on'); $('recLabel').textContent = 'Encore une !';
+    $('timer').textContent = '';
+    try {
+      voiceBuf = await decode(new Blob(chunks, { type: rec.mimeType || mime || 'audio/mp4' }));
+      analysis = analyse(voiceBuf);
+      lastFart = synth(analysis, STYLES[styleKey]);
+      ['fart','voice','share'].forEach(id => $(id).disabled = false);
+      draw(lastFart); play(lastFart);
+    } catch (e) { msg("Oups, je n'ai pas réussi à lire l'enregistrement. Réessaie !"); }
+  };
+  rec.start();
+  t0 = performance.now();
+  tick = setInterval(() => {
+    const s = (performance.now() - t0) / 1000;
+    $('timer').textContent = s.toFixed(1) + ' s';
+    if (s > 15 && rec.state === 'recording') rec.stop();
+  }, 100);
+  $('rec').classList.add('on'); $('recLabel').textContent = 'Stop';
+};
+
+$('fart').onclick  = () => { if (lastFart) { draw(lastFart); play(lastFart); } };
+$('voice').onclick = () => { if (voiceBuf) { draw(voiceBuf); play(voiceBuf); } };
+
+/* ---------- Partage en WAV ---------- */
+function toWav(b) {
+  const n = b.length, sr = b.sampleRate, data = b.getChannelData(0);
+  const ab = new ArrayBuffer(44 + n * 2), v = new DataView(ab);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4, 36 + n*2, true); w(8,'WAVE'); w(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  w(36,'data'); v.setUint32(40, n*2, true);
+  for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, data[i])); v.setInt16(44 + i*2, s < 0 ? s*0x8000 : s*0x7fff, true); }
+  return new Blob([ab], { type:'audio/wav' });
+}
+$('share').onclick = async () => {
+  if (!lastFart) return;
+  const file = new File([toWav(lastFart)], 'prout-parleur.wav', { type:'audio/wav' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files:[file] })) await navigator.share({ files:[file], title:'Prout Parleur 💨' });
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); }
+  } catch (e) {}
+};
+
+/* ---------- Installation ---------- */
+buildStyles();
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if (!standalone) {
+  const tip = $('installTip'), ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  tip.innerHTML = ios
+    ? "📲 Pour l'installer : bouton <b>Partager</b> de Safari → <b>Sur l'écran d'accueil</b>."
+    : "📲 Pour l'installer : menu <b>⋮</b> du navigateur → <b>Installer l'application</b>.";
+  tip.style.display = 'block';
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
