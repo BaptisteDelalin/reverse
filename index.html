@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Reverse Singing</title>
+<meta name="theme-color" content="#0f0c1d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Reverse">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root { --bg:#0f0c1d; --card:#1c1733; --accent:#ff4fa3; --accent2:#4fd1ff; --text:#f3f0ff; --muted:#a59ec9; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; background:var(--bg); }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--text);
+         background:radial-gradient(circle at top,#2a1f55,var(--bg) 60%) fixed; min-height:100vh;
+         padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+         -webkit-user-select:none; user-select:none; }
+  main { max-width:560px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:2rem; margin:8px 0 2px; text-align:center; }
+  h1 span { display:inline-block; transform:scaleX(-1); color:var(--accent); }
+  .sub { text-align:center; color:var(--muted); margin:0 0 18px; font-size:.95rem; }
+  .step { background:var(--card); border-radius:20px; padding:18px; margin-bottom:14px; border:1px solid #2f2856; }
+  .step h2 { margin:0 0 4px; font-size:1.1rem; display:flex; align-items:center; }
+  .step p { margin:0 0 14px; color:var(--muted); font-size:.9rem; }
+  .num { display:inline-flex; flex:none; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; align-items:center; justify-content:center; font-weight:700; margin-right:10px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .full { grid-column:1 / -1; }
+  button { font:inherit; font-weight:700; font-size:1rem; border:0; border-radius:14px; padding:16px 12px; cursor:pointer;
+           background:#342c63; color:var(--text); transition:transform .08s, background .2s; touch-action:manipulation; }
+  button:active:not(:disabled) { transform:scale(.96); }
+  button:disabled { opacity:.35; }
+  button.rec { background:var(--accent); font-size:1.15rem; padding:20px; }
+  button.rec.on { background:#ff2b2b; animation:pulse 1s infinite; }
+  button.big { background:linear-gradient(90deg,var(--accent),var(--accent2)); color:#111; }
+  button.ghost { background:transparent; border:1px solid #3d3470; color:var(--muted); }
+  @keyframes pulse { 50% { box-shadow:0 0 0 12px rgba(255,43,43,.18); } }
+  .timer { text-align:center; font-variant-numeric:tabular-nums; color:var(--muted); font-size:.9rem; margin-top:6px; }
+  canvas { width:100%; height:56px; display:block; margin-top:12px; background:#151129; border-radius:12px; }
+  .loop { display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted); font-size:.95rem; padding:6px 0 0; }
+  .loop input { width:22px; height:22px; accent-color:var(--accent); }
+  .msg { text-align:center; color:#ffb4b4; min-height:1.2em; font-size:.9rem; margin:0 0 8px; }
+  footer { text-align:center; color:var(--muted); font-size:.8rem; margin-top:18px; }
+  #installTip { display:none; background:#2a2250; border-radius:14px; padding:12px 14px; font-size:.85rem; color:var(--muted); margin-bottom:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Reverse <span>Singing</span> 🎤</h1>
+  <p class="sub">Chante → écoute à l'envers → imite → remets à l'endroit → 😂</p>
+  <div id="installTip"></div>
+  <p class="msg" id="msg"></p>
+
+  <section class="step">
+    <h2><span class="num">1</span>Chante l'original</h2>
+    <p>Un bout de refrain connu, 3 à 6 secondes.</p>
+    <div class="grid">
+      <button class="rec full" id="recA">● Enregistrer</button>
+      <button id="playA" disabled>▶ Normal</button>
+      <button class="big" id="revA" disabled>◀ À l'envers</button>
+    </div>
+    <div class="timer" id="tA"></div>
+    <label class="loop"><input type="checkbox" id="loopA"> écouter en boucle</label>
+    <canvas id="wA"></canvas>
+  </section>
+
+  <section class="step">
+    <h2><span class="num">2</span>Imite le charabia</h2>
+    <p>Apprends la version à l'envers, puis enregistre ton imitation.</p>
+    <div class="grid">
+      <button class="rec full" id="recB">● Enregistrer</button>
+      <button class="full" id="playB" disabled>▶ Mon imitation</button>
+    </div>
+    <div class="timer" id="tB"></div>
+    <canvas id="wB"></canvas>
+  </section>
+
+  <section class="step">
+    <h2><span class="num">3</span>Le moment de vérité</h2>
+    <p>Ton imitation remise à l'endroit. La chanson est reconnaissable ?</p>
+    <div class="grid">
+      <button class="big full" id="revB" disabled>🎉 Écouter le résultat</button>
+      <button id="cmp" disabled>⇄ Comparer</button>
+      <button id="share" disabled>📤 Partager</button>
+      <button class="ghost full" id="stop">■ Stop</button>
+    </div>
+  </section>
+
+  <footer>Tout reste sur le téléphone : aucun son n'est envoyé nulle part.</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let ctx, stream, current;
+const buf = { A:null, B:null };
+
+function audioCtx() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; }
+function msg(t) { $('msg').textContent = t || ''; }
+
+function reversed(b) {
+  const r = audioCtx().createBuffer(b.numberOfChannels, b.length, b.sampleRate);
+  for (let ch = 0; ch < b.numberOfChannels; ch++) {
+    const src = b.getChannelData(ch), dst = r.getChannelData(ch);
+    for (let i = 0, n = src.length; i < n; i++) dst[i] = src[n - 1 - i];
+  }
+  return r;
+}
+
+function stop() { if (current) { try { current.stop(); } catch(e){} current = null; } }
+
+function play(b, loop = false) {
+  stop();
+  const c = audioCtx(); c.resume();
+  const s = c.createBufferSource();
+  s.buffer = b; s.loop = loop; s.connect(c.destination); s.start();
+  current = s;
+  return new Promise(res => { s.onended = res; });
+}
+
+function draw(id, b) {
+  const cv = $(id), w = cv.width = cv.clientWidth * 2, h = cv.height = 112;
+  const g = cv.getContext('2d'); g.clearRect(0,0,w,h);
+  const d = b.getChannelData(0), step = Math.max(1, Math.floor(d.length / w));
+  g.fillStyle = id === 'wA' ? '#ff4fa3' : '#4fd1ff';
+  for (let x = 0; x < w; x++) {
+    let m = 0; for (let i = 0; i < step; i++) m = Math.max(m, Math.abs(d[x*step + i] || 0));
+    const bh = Math.max(2, Math.min(1, m * 1.4) * h); g.fillRect(x, (h - bh) / 2, 1, bh);
+  }
+}
+
+function refresh() {
+  $('playA').disabled = $('revA').disabled = !buf.A;
+  $('playB').disabled = $('revB').disabled = $('share').disabled = !buf.B;
+  $('cmp').disabled = !(buf.A && buf.B);
+}
+
+async function decode(blob) {
+  const ab = await blob.arrayBuffer();
+  const c = audioCtx();
+  return await new Promise((res, rej) => {
+    const p = c.decodeAudioData(ab, res, rej);
+    if (p && p.then) p.then(res, rej);
+  });
+}
+
+function pickMime() {
+  const types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/aac'];
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function setupRecorder(key) {
+  const btn = $('rec' + key), timer = $('t' + key);
+  let rec = null, chunks = [], t0 = 0, tick = null;
+  btn.onclick = async () => {
+    if (rec && rec.state === 'recording') { rec.stop(); return; }
+    msg(); stop(); audioCtx().resume();
+    try {
+      if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      msg("Micro refusé. Autorise le micro pour ce site dans les réglages du navigateur.");
+      return;
+    }
+    chunks = [];
+    const mime = pickMime();
+    rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    rec.ondataavailable = e => e.data && e.data.size && chunks.push(e.data);
+    rec.onstop = async () => {
+      clearInterval(tick); btn.classList.remove('on'); btn.textContent = '● Réenregistrer';
+      try {
+        buf[key] = await decode(new Blob(chunks, { type: rec.mimeType || mime || 'audio/mp4' }));
+        draw('w' + key, buf[key]); refresh();
+      } catch (e) { msg("Impossible de lire l'enregistrement, réessaie."); }
+    };
+    rec.start();
+    t0 = performance.now();
+    tick = setInterval(() => timer.textContent = ((performance.now() - t0) / 1000).toFixed(1) + ' s', 100);
+    btn.classList.add('on'); btn.textContent = '■ Stop';
+  };
+}
+
+// WAV encoder (pour partager le résultat)
+function toWav(b) {
+  const n = b.length, sr = b.sampleRate, data = b.getChannelData(0);
+  const ab = new ArrayBuffer(44 + n * 2), v = new DataView(ab);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4, 36 + n*2, true); w(8,'WAVE'); w(12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  w(36,'data'); v.setUint32(40, n*2, true);
+  for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, data[i])); v.setInt16(44 + i*2, s < 0 ? s*0x8000 : s*0x7fff, true); }
+  return new Blob([ab], { type:'audio/wav' });
+}
+
+setupRecorder('A');
+setupRecorder('B');
+
+$('playA').onclick = () => play(buf.A, $('loopA').checked);
+$('revA').onclick  = () => play(reversed(buf.A), $('loopA').checked);
+$('playB').onclick = () => play(buf.B);
+$('revB').onclick  = () => play(reversed(buf.B));
+$('cmp').onclick   = async () => { await play(buf.A); if (buf.B) play(reversed(buf.B)); };
+$('stop').onclick  = stop;
+$('share').onclick = async () => {
+  const file = new File([toWav(reversed(buf.B))], 'reverse-singing.wav', { type:'audio/wav' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files:[file] })) {
+      await navigator.share({ files:[file], title:'Reverse Singing' });
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+    }
+  } catch (e) { /* partage annulé */ }
+};
+
+// Aide à l'installation
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if (!standalone) {
+  const tip = $('installTip');
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  tip.innerHTML = ios
+    ? "📲 Pour l'installer : bouton <b>Partager</b> de Safari → <b>Sur l'écran d'accueil</b>."
+    : "📲 Pour l'installer : menu <b>⋮</b> du navigateur → <b>Installer l'application</b> (ou Ajouter à l'écran d'accueil).";
+  tip.style.display = 'block';
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "Reverse Singing",
+  "short_name": "Reverse",
+  "description": "Chante, écoute à l'envers, imite et remets à l'endroit.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0c1d",
+  "theme_color": "#0f0c1d",
+  "lang": "fr",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
